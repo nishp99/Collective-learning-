@@ -39,13 +39,15 @@ import json
 ODE functions
 """
 
-def order_params_ode(student, teacher, D, index):
-    R = jnp.einsum('D, D -> ', student[:index], teacher) / D
-    Q_r = jnp.einsum('D, D -> ', student[:index], student[:index]) / D
-    Q_i = jnp.einsum('D, D -> ', student[index:], student[index:]) / D
-    return R, Q_r, Q_i
+def order_params_ode(student_1, student_2, teacher, D):
+    J_1 = jnp.einsum('D, D -> ', student_1, teacher) / D
+    J_2 = jnp.einsum('D, D -> ', student_2, teacher) / D
+    Q_1 = jnp.einsum('D, D -> ', student_1, student_1) / D
+    Q_2 = jnp.einsum('D, D -> ', student_2, student_2) / D
+    Q_12 = jnp.einsum('D, D -> ', student_1, student_2) / D
+    return J_1, J_2, Q_1, Q_2, Q_12
 
-def Prob_correct(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
+def Prob_correct(J_1, J_2, Q_1, Q_2, Q_12, S, epsilon):
     P = ((1/2 + 1/jnp.pi * jnp.arcsin(R / (jnp.sqrt((S_r + delta * S_i) * (Q_r + delta * Q_i))))) * 
          (1 - 2 * epsilon) + epsilon)
     return P
@@ -57,40 +59,77 @@ def Baseline(R, Q_r, Q_i, S_r, S_i, r_1, r_2, T, delta, sigma_1, sigma_2, epsilo
 """
 functions to calculate expectations of relevant aligning field quantities
 """
-def Nu_sgn_nu(S_r, S_i, delta, epsilon):
-    return jnp.sqrt(2/jnp.pi) * S_r /jnp.sqrt(S_r + delta * S_i) * (1 - 2 * epsilon)
+def Mod_Nu(S):
+    return jnp.sqrt(2 * S/ jnp.pi)
 
-def Nu_sgn_lambda(R, Q_r, Q_i, delta):
-    return R / jnp.sqrt(Q_r + delta * Q_i) * jnp.sqrt(2/jnp.pi)
+def Mod_1(Q_1):
+    return jnp.sqrt(2 * Q_1/ jnp.pi)
 
-def Lambdar_sgn_nu(R, S_r, S_i, delta, epsilon):
-    return R / jnp.sqrt(S_r + delta * S_i) * jnp.sqrt(2/jnp.pi) * (1 - 2 * epsilon) 
+def Mod_2(Q_2):
+    return jnp.sqrt(2 * Q_2/ jnp.pi)
 
-def Lambdar_sgn_lambda(Q_r, Q_i, delta):
-    return Q_r / jnp.sqrt(Q_r + delta * Q_i) * jnp.sqrt(2/jnp.pi)
+def Sgn_Nu_1(J_1, S):
+    return jnp.sqrt(2 / jnp.pi) * J_1 / jnp.sqrt(S)
 
-def Lambdai_sgn_lambda(Q_r, Q_i, delta):
-    return delta * Q_i / jnp.sqrt(Q_r + delta * Q_i) * jnp.sqrt(2/jnp.pi)
+def Sgn_Nu_2(J_2, S):
+    return jnp.sqrt(2 / jnp.pi) * J_2 / jnp.sqrt(S)
 
-def Nu_sgn_lambda_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * (Nu_sgn_nu(S_r, S_i, delta, epsilon) + Nu_sgn_lambda(R, Q_r, Q_i, delta))
+def Sgn_1_2(Q_1, Q_12):
+    return jnp.sqrt(2 / jnp.pi) * Q_12 / jnp.sqrt(Q_1)
 
-def Lambdar_sgn_lambda_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * (Lambdar_sgn_nu(R, S_r, S_i, delta, epsilon) + Lambdar_sgn_lambda(Q_r, Q_i, delta))
+def Sgn_2_1(Q_2, Q_12):
+    return jnp.sqrt(2 / jnp.pi) * Q_12 / jnp.sqrt(Q_2)
 
-def Lambdai_sgn_lambda_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * Lambdai_sgn_lambda(Q_r, Q_i, delta)
+def Nu_sgn_1(J_1, Q_1):
+    return jnp.sqrt(2 / jnp.pi) * J_1 / jnp.sqrt(Q_1)
 
-def Nu_sgn_lambda_neg_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * (Nu_sgn_lambda(R, Q_r, Q_i, delta) - Nu_sgn_nu(S_r, S_i, delta, epsilon))
+def Nu_sgn_2(J_2, Q_2):
+    return jnp.sqrt(2 / jnp.pi) * J_2 / jnp.sqrt(Q_2)
 
-def Lambdar_sgn_lambda_neg_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * (Lambdar_sgn_lambda(Q_r, Q_i, delta) - Lambdar_sgn_nu(R, S_r, S_i, delta, epsilon))
+def Rho_12(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return (Q_12 * S - J_1 * J_2) / jnp.sqrt((Q_1 * S - J_1**2) * (Q_2 * S - J_2**2))
 
-def Lambdai_sgn_lambda_neg_heaviside(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    return 1 / 2 * Lambdai_sgn_lambda(Q_r, Q_i, delta)
+def Rho_1(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return (J_2 * Q_1 - J_1 * Q_12) / jnp.sqrt((Q_1 * S -J_1*2) * (Q_1 * Q_2 - Q_12**2))
+
+def Rho_2(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return (J_1 * Q_2 - J_2 * Q_12) / jnp.sqrt((Q_2 * S -J_2*2) * (Q_1 * Q_2 - Q_12**2))
+
+def Heavi_12_Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
+    prob = 1/4 + 1/(2 * jnp.pi) * (jnp.arcsin(Q_12 / jnp.sqrt(Q_1*Q_2)) + jnp.arcsin(J_1/jnp.sqrt(Q_1*S)) + jnp.arcsin(J_2/jnp.sqrt(Q_2*S)))
+    return prob
+
+def Heavi_12_negheavi_2_Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
+    prob = 1/(2 * jnp.pi) * (-jnp.arccos(Q_12 / jnp.sqrt(Q_1*Q_2)) + jnp.arccos(J_1/jnp.sqrt(Q_1*S)) + jnp.arccos(J_2/jnp.sqrt(Q_2*S)))
+    return prob
+
+def Heavi_12_sgn_2_Nu(J_1, J_2, Q_1, Q_2, Q_12):
+    return (J_1/jnp.sqrt(Q_1) + J_2/jnp.sqrt(Q_2)) * (jnp.sqrt(Q_1*Q_2) - Q_12) / (jnp.pi * jnp.sqrt(Q_1*Q_2 - Q_12**2))
+
+def Heavi_12_mod_Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return (J_1 + J_2 + jnp.sqrt(2 * S / jnp.pi) - 
+            1/jnp.pi * (jnp.sqrt(2*S/jnp.pi) * jnp.arccos(Rho_12(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        2 * J_1 * jnp.arccos(Rho_1(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        2 * J_2 * jnp.arccos(Rho_2(J_1, J_2, Q_1, Q_2, Q_12, S))))
+
+def Sgn_1_sgn_2_mod_Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return (jnp.sqrt(2 / jnp.pi) * (J_1/jnp.sqrt(Q_1) + J_2/jnp.sqrt(Q_2) + jnp.sqrt(S)) - 
+            4/(jnp.pi * jnp.sqrt(2*jnp.pi)) * (J_1/jnp.sqrt(Q_1) * jnp.arccos(Rho_1(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        J_2/jnp.sqrt(Q_2) * jnp.arccos(Rho_2(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        jnp.sqrt(S) * jnp.arccos(Rho_12(J_1, J_2, Q_1, Q_2, Q_12, S))))
+
+def Sgn_2_sgn_Nu_mod_1(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return 2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * (jnp.sqrt(Q_1) * jnp.arcsin(Rho_1(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        Q_12 / jnp.sqrt(Q_2) * jnp.arcsin(Rho_2(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        J_1 / jnp.sqrt(S) * jnp.arcsin(Rho_12(J_1, J_2, Q_1, Q_2, Q_12, S)))
+
+def Sgn_1_sgn_Nu_mod_2(J_1, J_2, Q_1, Q_2, Q_12, S):
+    return 2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * (jnp.sqrt(Q_2) * jnp.arcsin(Rho_2(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        Q_12 / jnp.sqrt(Q_1) * jnp.arcsin(Rho_1(J_1, J_2, Q_1, Q_2, Q_12, S)) +
+                        J_2 / jnp.sqrt(S) * jnp.arcsin(Rho_12(J_1, J_2, Q_1, Q_2, Q_12, S)))
+
+
     
-
 """
 calculate order parameter updates
 """

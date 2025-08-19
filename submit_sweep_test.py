@@ -32,7 +32,7 @@ def create_shared_parser(**kwargs):
 experiment_name = 'n_sweep_optimal_lr'
 
 Ts= [13]
-ns=[i for i in range(5,14)]  # student hidden units
+ns=[i for i in range(5,14)]
 lrs=[1.0]
 r_1s=[1.0]
 r_2s=[0.0]
