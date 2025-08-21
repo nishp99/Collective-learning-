@@ -29,54 +29,43 @@ def create_shared_parser(**kwargs):
     return parser
 
 
-experiment_name = 'n_sweep_optimal_lr'
+experiment_name = 'test_ode'
 
-Ts= [13]
-ns=[i for i in range(5,14)]
+Ts= [6]
 lrs=[1.0]
 r_1s=[1.0]
-r_2s=[0.0]
-epsilons=[0.0]
-sigma_1s=[1.0]
-sigma_2s=[1.0]
-baseline=False
-optimal_LR_bool=True
+r_2s=[1.0]
+r_12s=[1.0]
+tau_1s=[0.0]
+tau_2s=[0.0]
 D = 400
 epochs=10000
 savepoints=100
 
-deltas = [0.0]
-rhos=[0.0]
 
 
-
-base_folder_name = f'T{Ts[0]}lr{lrs[0]}r_1{r_1s[0]}r_2{r_2s[0]}rho{rhos[0]}delta{deltas[0]}sigma1{sigma_1s[0]}sigma2{sigma_2s[0]}epsilon{epsilons[0]}baseline{baseline}epochs{epochs}savepoints{savepoints}'
+base_folder_name = f'r_1{r_1s[0]}r_2{r_2s[0]}r_12{r_12s[0]}tau_1{tau_1s[0]}tau_2{tau_2s[0]}epochs{epochs}savepoints{savepoints}'
 
 """
 change actual_folder_name to reflect the sweep being run
 """
-actual_folder_name = f'T{Ts[0]}lr{lrs[0]}r_1{r_1s[0]}r_2{r_2s[0]}rho{rhos[0]}delta{deltas[0]}sigma1{sigma_1s[0]}sigma2{sigma_2s[0]}epsilon{epsilons[0]}baseline{baseline}epochs{epochs}savepoints{savepoints}'
+actual_folder_name = f'r_1{r_1s[0]}r_2{r_2s[0]}r_12{r_12s[0]}tau_1{tau_1s[0]}tau_2{tau_2s[0]}epochs{epochs}savepoints{savepoints}'
 timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-basepath = f'/ceph/scratch/npatel/le_cake/single_sweep_results/{experiment_name}/{timestamp}/{actual_folder_name}'
+basepath = f'/ceph/scratch/npatel/collective_learning/{experiment_name}/{timestamp}/{actual_folder_name}'
 log_path = f'./logs/{timestamp}/'
-run_name = 'ode_sweep'
+run_name = 'ode_test'
 
 if not os.path.isdir(basepath):
     os.makedirs(basepath)
 
 shared_args = create_shared_parser(
     Ts=Ts,
-    ns=ns,
     lrs=lrs,
     r_1s=r_1s,
     r_2s=r_2s,
-    deltas=deltas,
-    rhos=rhos,
-    epsilons=epsilons,
-    sigma_1s=sigma_1s,
-    sigma_2s=sigma_2s,
-    baseline=not baseline,
-    optimal_LR=not optimal_LR_bool,
+    r_12s=r_12s,
+    tau_1s=tau_1s,
+    tau_2s=tau_2s,
     logdir=basepath,
     D=D,
     epochs=epochs,
@@ -108,7 +97,7 @@ executor.update_parameters(name=run_name,
                            gpus_per_node=1,
                            tasks_per_node=1,
                            cpus_per_task=4,
-                           timeout_min=60,
+                           timeout_min=20,
                            slurm_partition='gpu_saxe')
 
 #jobs = executor.map_array(main_batch.main_batched, all_args)
