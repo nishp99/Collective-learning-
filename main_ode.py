@@ -175,27 +175,28 @@ def update_D_times(dt, eta, T, r_1, r_2, r_12, tau_1, tau_2, J_1, J_2, Q_1, Q_2,
 
     return lax.fori_loop(0, D, body, (J_1, J_2, Q_1, Q_2, Q_12))
 
+"""
+jittable way for finding corresponding index
+"""
 def lookup_index(x, keys, values):
     match = keys == x + 1
     exists = jnp.any(match)              # bool[]
     first_idx = jnp.argmax(match)        # int[]
     return jnp.where(exists, values[first_idx], -1)
 
-def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints):
+"""
+numerically solve the ODE for given parameters for given number of epochs,
+storing savepoints number of points logarithmically spaced
+"""
+def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints, 
+               J_1_init=1e-4, J_2_init=1e-4, Q_1_init=1, Q_2_init=1, Q_12_init=1e-4, S=1):
     
-    # Initialize order parameters either from standard values or from simulation values
-    """R = 1e-4 + (R - 1e-4) * use_simulation_initialization
-    Q_r = (1 - jnp.sign(rho) * rho) + (Q_r - (1 - jnp.sign(rho) * rho)) * use_simulation_initialization
-    Q_i = jnp.heaviside(rho, 0) * (rho + (Q_i - rho) * use_simulation_initialization)
-    S_r = (1 - jnp.sign(rho) * rho) + (S_r - (1 - jnp.sign(rho) * rho)) * use_simulation_initialization
-    S_i = jnp.heaviside(-rho, 0) * (-rho + (S_i + rho) * use_simulation_initialization)"""
-
-    J_1 = 1e-4
-    J_2 = 1e-4
-    Q_1 = 1
-    Q_2 = 1
-    Q_12 = 1e-4
-    S = 1
+    J_1 = J_1_init
+    J_2 = J_2_init
+    Q_1 = Q_1_init
+    Q_2 = Q_2_init
+    Q_12 = Q_12_init
+    S = S
 
     log_keys = np.unique(np.logspace(0, np.log10(epochs - 1), num=savepoints, dtype=int))
     save_number = len(log_keys)
@@ -249,7 +250,8 @@ def main_batched(args):
 
     #run batch of ODEs
     start = time.time()
-    results = vmapped_ODE_solver(lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch, dt, args.epochs, args.savepoints)
+    results = vmapped_ODE_solver(lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch, dt, args.epochs, args.savepoints,
+                                 args.J_1_init, args.J_2_init, args.Q_1_init, args.Q_2_init, args.Q_12_init, args.S)
     
     #store results in pandas dataframe
     J_1_vals, J_2_vals, Q_1_vals, Q_2_vals, Q_12_vals = jnp.array(results)

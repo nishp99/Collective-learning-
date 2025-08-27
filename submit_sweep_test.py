@@ -2,7 +2,7 @@ import submitit
 from datetime import datetime
 import numpy as np
 import argparse
-import main_batch
+import main_ode
 import json
 import os
 
@@ -101,4 +101,4 @@ executor.update_parameters(name=run_name,
                            slurm_partition='gpu_saxe')
 
 #jobs = executor.map_array(main_batch.main_batched, all_args)
-jobs = executor.map_array(main_batch.main_batched_N_more, all_args)
+jobs = executor.map_array(main_ode.main_batched, all_args)
