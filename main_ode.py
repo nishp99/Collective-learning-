@@ -2,7 +2,7 @@ import numpy as np
 import multiprocessing
 import argparse
 import os
-import joblib as jl
+#import joblib as jl
 
 def configure_jax_cpu_threads():
     # Detect CPU thread count from SLURM or fallback
@@ -103,12 +103,9 @@ def SgniNu_modj(J_i, J_j, Q_i, Q_j, Q_12, S):
 """
 calculate order parameter updates
 """
-def Shared_J_update(T, sgn1_Nu, sgn2_Nu, sgn12_modNu, modNu, P_12_collab):
-    return 1 / 4 * P_12_collab**(T - 1) * (sgn1_Nu + sgn2_Nu - sgn12_modNu - modNu)
-
-def dJ_i(T, eta, r_i, r_j, r_12, tau_j, sgni_Nu, sgn12_modNu, modNu, P_i, P_j, shared_update):
+def dJ_i(T, eta, r_i, r_j, r_12, tau_j, sgni_Nu, sgnj_Nu, sgn12_modNu, modNu, P_i, P_j, P_12_collab):
     dj = eta * (r_i / 2 * P_i**(T - 1) * (sgni_Nu + modNu) + tau_j * r_j / 2 * P_j**(T - 1) * (sgn12_modNu + sgni_Nu)
-                  + r_12 * shared_update)
+                  + r_12 / 4 * P_12_collab**(T - 1) * (sgni_Nu + sgnj_Nu - sgn12_modNu - modNu))
     return dj
 
 def dQ_i(T, eta, r_i, r_j, r_12, tau_j, modi, modj, sgnNu_i, sgnjNu_modi, sgnj_i, 
@@ -161,10 +158,8 @@ def update_D_times(dt, eta, T, r_1, r_2, r_12, tau_1, tau_2, J_1, J_2, Q_1, Q_2,
         mod2 = ModLambda(Q_2)
         modNu = ModNu(S)
 
-        shared_update = Shared_J_update(T, sgn1_Nu, sgn2_Nu, sgn12_modNu, modNu, P_12_collab)
-
-        dJ_1 = dJ_i(T, eta, r_1, r_2, r_12, tau_2, sgn1_Nu, sgn12_modNu, modNu, P_1, P_2, shared_update) * dt
-        dJ_2 = dJ_i(T, eta, r_2, r_1, r_12, tau_1, sgn2_Nu, sgn12_modNu, modNu, P_2, P_1, shared_update) * dt
+        dJ_1 = dJ_i(T, eta, r_1, r_2, r_12, tau_2, sgn1_Nu, sgn2_Nu, sgn12_modNu, modNu, P_1, P_2, P_12_collab) * dt
+        dJ_2 = dJ_i(T, eta, r_2, r_1, r_12, tau_1, sgn2_Nu, sgn1_Nu, sgn12_modNu, modNu, P_2, P_1, P_12_collab) * dt
         dQ_1 = dQ_i(T, eta, r_1, r_2, r_12, tau_2, mod1, mod2, sgnNu_1, sgn2Nu_mod1, sgn2_1, P_1, P_2, P_12, P_12_collab) * dt
         dQ_2 = dQ_i(T, eta, r_2, r_1, r_12, tau_1, mod2, mod1, sgnNu_2, sgn1Nu_mod2, sgn1_2, P_2, P_1, P_12, P_12_collab) * dt
         dQ_12 = dQ_ij(T, eta, r_1, r_2, r_12, tau_1, tau_2, mod1, mod2, sgn1_2, sgn2_1, sgnNu_1, sgnNu_2, sgn12, sgnNu1, 
@@ -242,6 +237,7 @@ vmapped_ODE_solver = jax.vmap(ODE_solver, in_axes=(0, 0, 0, 0, 0, 0, 0, None, No
 
 
 def main_batched(args):
+    jax.config.update("jax_platform_name", "cpu")
     dt = 1 / args.D
     os.makedirs(args.logdir, exist_ok=True)
 

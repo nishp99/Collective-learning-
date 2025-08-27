@@ -21,41 +21,6 @@ rho is dim (1)
 """
 
 """
-create initial n students and teacher
-"""
-
-def create_student(dim, n, key):
-    student = random.normal(key, shape=(dim))
-    students = jnp.tile(student, (n, 1))
-    return students
-
-def create_teacher(relevant_dim, key):
-    teacher = random.normal(key, shape=(relevant_dim))
-    teacher = teacher / jnp.linalg.norm(teacher) * jnp.sqrt(relevant_dim)
-    return teacher
-
-"""
-calculate order parameters
-"""
-def order_parameters(students, teacher, D, index):
-    R = jnp.einsum('n D, D -> n', students[:, :index], teacher[:index]) / D
-    Q_r = jnp.einsum('n D, n D -> n', students[:, :index], students[:, :index]) / D
-    Q_i = jnp.einsum('n D, n D -> n', students[:, index:], students[:, index:]) / D
-    return R, Q_r, Q_i
-
-#order_parameters = jit(order_parameters, static_argnums=(3))
-
-"""
-create population covariance
-"""
-def population_covariance(D, delta, index):
-    covariance_matrix = np.zeros((D, D))
-    #index = int(jnp.round((1-rho) * D))
-    covariance_matrix[:index, :index] = jnp.eye(index)
-    covariance_matrix[index:, index:] = jnp.eye(D - index) * delta
-    return covariance_matrix
-
-"""
 randomly initialize seed
 """
 def random_seed():
@@ -70,42 +35,44 @@ def create_key(seed):
     return key
 
 """
+create initial n students and teacher
+"""
+def create_student(dim, n, key):
+    student = random.normal(key, shape=(dim))
+    students = jnp.tile(student, (n, 1))
+    return students
+
+def create_teacher(dim, key):
+    teacher = random.normal(key, shape=(dim))
+    teacher = teacher / jnp.linalg.norm(teacher) * jnp.sqrt(dim)
+    return teacher
+
+"""
+calculate order parameters
+"""
+def order_params_ode(students_1, students_2, teacher, D):
+    J_1 = jnp.einsum('n D, D -> n', students_1, teacher) / D
+    J_2 = jnp.einsum('n D, D -> n', students_2, teacher) / D
+    Q_1 = jnp.einsum('n D, n D -> n', students_1, students_1) / D
+    Q_2 = jnp.einsum('n D, n D -> n', students_2, students_2) / D
+    Q_12 = jnp.einsum('n D, n D -> n', students_1, students_2) / D
+    return J_1, J_2, Q_1, Q_2, Q_12
+
+"""
 sample obervations for a discrete amount of time for all parallel students for entire episodes
 """
-def sample_observations(T, D, n, Covariance, key):
-    X_s = random.multivariate_normal(key, mean=jnp.zeros(Covariance.shape[0]), cov=Covariance, shape=(n, T, D))
+#@jit
+def sample_observations(T, D, n, key):
+    X_s = random.multivariate_normal(key, mean=jnp.zeros(D), cov=jnp.eye(D), shape=(n, T, D))
     return X_s
-"""
-sample reward noise for a discrete amount of time for all parallel students for entire episodes
-"""
-def sample_reward_noise(D, n, sigma, key):
-    Epsilon_s = random.bernoulli(key, p=sigma, shape=(n, D)).astype(jnp.int32)
-    return Epsilon_s
-
-def sample_teacher_noise(T, D, n, epsilon, key):
-    Z_s = 2 * random.bernoulli(key, p=1-epsilon, shape=(n, T, D)).astype(jnp.int32) - 1
-    return Z_s
 
 """
 sample create teacher decisions
 """
-def teacher_decisions(teacher, X_s, Z_s, index):
-    Y_t_s = jnp.sign(jnp.einsum('D, n T J D -> n T J', teacher, X_s[:, :, :, :index])) * Z_s
+#@jit
+def teacher_decisions(teacher, X_s, index):
+    Y_t_s = jnp.sign(jnp.einsum('D, n T J D -> n T J', teacher, X_s[:, :, :, :index]))
     return Y_t_s
-
-"""
-calculate baseline (assume perfect value function)
-"""
-def Prob_correct_sim(R, Q_r, Q_i, S_r, S_i, delta, epsilon):
-    P = (1/2 + 1/jnp.pi * jnp.arcsin(R / jnp.sqrt((S_r + delta * S_i) * (Q_r + delta * Q_i)))) * (1 - 2 * epsilon) + epsilon
-    return P
-
-
-def calculate_baseline(students, teacher, r_1, r_2, delta, sigma_1, sigma_2, epsilon, S_r, S_i, D, T, index):
-    R, Q_r, Q_i = order_parameters(students, teacher, D, index)
-    Prob = Prob_correct_sim(R, Q_r, Q_i, S_r, S_i, delta, epsilon)
-    baseline = (sigma_1 + sigma_2 - 1) * (r_1 + r_2) * Prob**T + (1 - sigma_1) * r_1 - sigma_1 * r_2
-    return baseline
 
 """
 actions
@@ -113,103 +80,131 @@ actions
 def student_actions(students, x_s):
     y_s = jnp.sign(jnp.einsum('n D, n T D -> n T', students, x_s))
     return y_s
-
-def teacher_actions(teacher, x_s, z_s, index):
-    y_t = jnp.sign(jnp.einsum('D, n T D -> n T', teacher, x_s[:, :, :index])) * z_s
-    return y_t
-
 """
 example reward function (lets choose extended Hebbian for now)
 lets lose the discounted reward for now, as discount factor is 1. and hard code the rewards
 """
-def rl_perceptron_ALL(y_s, y_t, r_1, r_2, epsilon_1_s, epsilon_2_s, baseline):
-    reward = (jnp.all(y_s == y_t, axis=1).astype(jnp.float32) * (epsilon_1_s + epsilon_2_s - 1) * (r_1 + r_2) + 
-              (1 - epsilon_1_s) * r_1 - epsilon_1_s * r_2 - baseline)
+def Individual_ALL(y_s, y_t):
+    reward = jnp.all(y_s == y_t, axis=1).astype(jnp.float32)
     #rewards = jnp.zeros_like(y_s, dtype=jnp.float32)
     #rewards = rewards.at[:, -1].set(reward)
-    rewards = jnp.ones_like(y_s, dtype=jnp.float32)
-    rewards = rewards * reward[:, None]
-    return rewards
+    #rewards = jnp.ones_like(y_s, dtype=jnp.float32)
+    #rewards = rewards * reward[:, None]
+    return reward
 
-def rl_perceptron_NMORE(y_s, y_t, r_1, r_2, T, n, epsilon_1_s, epsilon_2_s, baseline):
-    reward = (jnp.where(jnp.sum(y_s * y_t, axis=1) >= 2*n - T , 1, 0).astype(jnp.float32) * (epsilon_1_s + epsilon_2_s - 1) * (r_1 + r_2) + 
-              (1 - epsilon_1_s) * r_1 - epsilon_1_s * r_2 - baseline)
-    #rewards = jnp.zeros_like(y_s, dtype=jnp.float32)
-    #rewards = rewards.at[:, -1].set(reward)
-    rewards = jnp.ones_like(y_s, dtype=jnp.float32)
-    rewards = rewards * reward[:, None]
-    return rewards
+def Collaborative_ALL(y_1, y_2, y_t):
+    reward = (jnp.all(y_1 == y_2, axis=1) * jnp.all(y_1 == y_t, axis=1)).astype(jnp.float32)
+    return reward
+
+def Reward(r_1, r_2, r_12, tau_1, tau_2, y_1, y_2, y_t):
+    collaborative_reward = r_12 * Collaborative_ALL(y_1, y_2, y_t)
+    reward_1 = r_1 * Individual_ALL(y_1, y_t)
+    reward_2 = r_2 * Individual_ALL(y_2, y_t)
+
+    R_1 = reward_1 + tau_2 * reward_2 + collaborative_reward
+    R_2 = reward_2 + tau_1 * reward_1 + collaborative_reward
+    return R_1, R_2
     
-"""
-discounted reward (mediate for future reward)
-"""
-def discounted_reward(rewards, discount, T):
-    discounted_future_rewards = jnp.zeros_like(rewards, dtype=jnp.float32)
-    cumulative_reward = 0
-    for t in range(T - 1, -1, -1):
-        cumulative_reward = rewards[:, t] + discount * cumulative_reward
-        discounted_future_rewards = discounted_future_rewards.at[:, t].set(cumulative_reward)
-
-    return discounted_future_rewards
-
 """
 update equation
 """
-@jit
-def student_update(y_s, x_s, G_s, lr, D, T):
-    update = lr / (T * jnp.sqrt(D)) * jnp.einsum('n T, n T D -> n D',(y_s * G_s), x_s)
+def student_update(y_s, x_s, R, lr, D, T):
+    update = lr / (T * jnp.sqrt(D)) * jnp.einsum('n T, n T D -> n D',(y_s * R), x_s)
     return update
 
-"""def update_student_D_times(students, teacher, X_s, Epsilon_s, Z_s, D, T, index, lr, r_1, r_2):
+def Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2):
+
+    def body_fn(i, carry):
+        students_1, students_2 = carry
+        x_s = X_s[:, :, i, :]
+        y_t = Y_t_s[:, :, i]
+        
+        y_1_s = student_actions(students_1, x_s)
+        y_2_s = student_actions(students_2, x_s)
+        R_1_s, R_2_s = Reward(r_1, r_2, r_12, tau_1, tau_2, y_1_s, y_2_s, y_t)
+
+        students_1 = students_1 + student_update(y_1_s, x_s, R_1_s, lr, D, T)
+        students_2 = students_2 + student_update(y_2_s, x_s, R_2_s, lr, D, T)
+
+        J_1, J_2, Q_1, Q_2, Q_12 = order_params_ode(students_1, students_2, teacher, D)
+
+        return students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12
+
+    return lax.fori_loop(0, D, body_fn, (students_1, students_2))
+#Update_student_D_times = jit(Update_student_D_times, static_argnums=(4,5,6,7,8,9,10,11))
+
+#delete below function when on cluster
+"""def Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2):
+
     for i in range(D):
         x_s = X_s[:, :, i, :]
-        epsilon_s = Epsilon_s[:, i]
-        z_s = Z_s[:, :, i]
-
-        y_s = student_actions(students, x_s)
-        y_t = teacher_actions(teacher, x_s, z_s, index)
-        G_s = rl_perceptron_Hebbian(y_s, y_t, r_1, r_2, epsilon_s)
-
-        students = students + student_update(y_s, x_s, G_s, lr, D, T)
-
-    return students"""
-    
-#update_student_D_times = jit(update_student_D_times, static_argnums=(3, 4, 5))
-
-def update_student_D_times(students, X_s, Epsilon_1_s, Epsilon_2_s, Y_t_s, D, T, n, lr, r_1, r_2, baseline_bool, 
-                           teacher, delta, sigma_1, sigma_2, epsilon, S_r, S_i, student_index, min_index):
-
-    def body_fn(i, students):
-        x_s = X_s[:, :, i, :student_index]
-
-        epsilon_1_s = Epsilon_1_s[:, i]
-        epsilon_2_s = Epsilon_2_s[:, i]
         y_t = Y_t_s[:, :, i]
-
-        baseline = baseline_bool * calculate_baseline(students, teacher, r_1, r_2, delta, sigma_1, sigma_2, 
-                                                      epsilon, S_r, S_i, D, T, min_index)
         
-        y_s = student_actions(students, x_s)
-        #y_t = teacher_actions(teacher, x_s, z_s, index)
-        #G_s = rl_perceptron_ALL(y_s, y_t, r_1, r_2, epsilon_1_s, epsilon_2_s, baseline)
-        G_s = rl_perceptron_NMORE(y_s, y_t, r_1, r_2, T, n, epsilon_1_s, epsilon_2_s, baseline)
+        y_1_s = student_actions(students_1, x_s)
+        y_2_s = student_actions(students_2, x_s)
+        R_1_s, R_2_s = Reward(r_1, r_2, r_12, tau_1, tau_2, y_1_s, y_2_s, y_t)
 
-        students = students + student_update(y_s, x_s, G_s, lr, D, T)
+        students_1 = students_1 + student_update(y_1_s, x_s, R_1_s, lr, D, T)
+        students_2 = students_2 + student_update(y_2_s, x_s, R_2_s, lr, D, T)
 
-        return students
+        J_1, J_2, Q_1, Q_2, Q_12 = order_params_ode(students_1, students_2, teacher, D)
 
-    students = lax.fori_loop(0, D, body_fn, students)
-    return students
+    return students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12"""
+
+"""
+jittable way for finding corresponding index
+"""
+def lookup_index(x, keys, values):
+    match = keys == x + 1
+    exists = jnp.any(match)              # bool[]
+    first_idx = jnp.argmax(match)        # int[]
+    return jnp.where(exists, values[first_idx], -1)
+
+"""
+run the simulation for single set of parameters and given number of epochs, 
+and store the order parameters at logarithmically spaced intervals
+"""
+def Run_simulation(D, n, lr, teacher, students_1, students_2, T, r_1, r_2, r_12, tau_1, tau_2, epochs, savepoints):
+
+    log_keys = np.unique(np.logspace(0, np.log10(epochs - 1), num=savepoints, dtype=int))
+    save_number = len(log_keys)
+    log_keys = jnp.array(log_keys)
+    log_values = jnp.arange(save_number, dtype=int)
+
+    J_1_s = jnp.zeros((save_number+1, n))
+    J_2_s = jnp.zeros((save_number+1, n))
+    Q_1_s = jnp.zeros((save_number+1, n))
+    Q_2_s = jnp.zeros((save_number+1, n))
+    Q_12_s = jnp.zeros((save_number+1, n))
+
+    J_1, J_2, Q_1, Q_2, Q_12 = order_params_ode(students_1, students_2, teacher, D)
+
+    for epoch in range(epochs):
+        index = lookup_index(epoch, log_keys, log_values)
+        J_1_s = J_1_s.at[index, :].set(J_1)
+        J_2_s = J_2_s.at[index, :].set(J_2)
+        Q_1_s = Q_1_s.at[index, :].set(Q_1)
+        Q_2_s = Q_2_s.at[index, :].set(Q_2)
+        Q_12_s = Q_12_s.at[index, :].set(Q_12)
+
+        x_key = create_key(random_seed())
+        X_s = sample_observations(T, D, n, x_key)
+        Y_t_s = teacher_decisions(teacher, X_s, T)
+
+        students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, 
+                                                                                  D, T, lr, r_1, r_2, r_12, tau_1, tau_2)
+        
+    return J_1_s[:save_number, :], J_2_s[:save_number, :], Q_1_s[:save_number, :], Q_2_s[:save_number, :], Q_12_s[:save_number, :]
+
+"""def main(args):
+    teacher = create_teacher(D, create_key(random_seed()))
+    student_1 = create_student(D, n, create_key(random_seed()))
+    student_2 = create_student(D, n, create_key(random_seed()))"""
 
 
-if __name__ == "__main__":
+
+"""if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
-
-    sample_observations = jit(sample_observations, static_argnums=(0, 1, 2))
-    sample_reward_noise = jit(sample_reward_noise, static_argnums=(0, 1))
-    sample_teacher_noise = jit(sample_teacher_noise, static_argnums=(0, 1, 2))
-    teacher_decisions = jit(teacher_decisions, static_argnums=(3))
-    teacher_actions = jit(teacher_actions, static_argnums=(3))
-    discounted_reward = jit(discounted_reward, static_argnums=(2))
-    update_student_D_times = jit(update_student_D_times, static_argnums=(5, 6, 7, 19, 20))
+"""
+    
