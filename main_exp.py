@@ -3,22 +3,6 @@ import jax.numpy as jnp
 from jax import random, jit, lax
 import jax
 import argparse
-"""
-student is dim (D)
-teacher is dim (D)
-x_s is dim (T,D)
-y_s is dim (T)
-G_s is dim (T)
-
-lr is dim (1)
-D is dim (1)
-T is dim (1)
-gamma is dim (1)
-
-a is dim (1)
-b is dim (1)
-rho is dim (1)
-"""
 
 """
 randomly initialize seed
@@ -50,6 +34,7 @@ def create_teacher(dim, key):
 """
 calculate order parameters
 """
+
 def order_params_ode(students_1, students_2, teacher, D):
     J_1 = jnp.einsum('n D, D -> n', students_1, teacher) / D
     J_2 = jnp.einsum('n D, D -> n', students_2, teacher) / D
@@ -70,8 +55,8 @@ def sample_observations(T, D, n, key):
 sample create teacher decisions
 """
 #@jit
-def teacher_decisions(teacher, X_s, index):
-    Y_t_s = jnp.sign(jnp.einsum('D, n T J D -> n T J', teacher, X_s[:, :, :, :index]))
+def teacher_decisions(teacher, X_s):
+    Y_t_s = jnp.sign(jnp.einsum('D, n T J D -> n T J', teacher, X_s))
     return Y_t_s
 
 """
@@ -109,13 +94,14 @@ def Reward(r_1, r_2, r_12, tau_1, tau_2, y_1, y_2, y_t):
 update equation
 """
 def student_update(y_s, x_s, R, lr, D, T):
-    update = lr / (T * jnp.sqrt(D)) * jnp.einsum('n T, n T D -> n D',(y_s * R), x_s)
+    update = lr / (T * jnp.sqrt(D)) * jnp.einsum('n T, n T D -> n D',(y_s * R[:, jnp.newaxis]), x_s)
     return update
 
-def Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2):
+def Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12, 
+                           X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2):
 
-    def body_fn(i, carry):
-        students_1, students_2 = carry
+    def body(i, carry):
+        students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = carry
         x_s = X_s[:, :, i, :]
         y_t = Y_t_s[:, :, i]
         
@@ -130,7 +116,7 @@ def Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, D, T, lr
 
         return students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12
 
-    return lax.fori_loop(0, D, body_fn, (students_1, students_2))
+    return lax.fori_loop(0, D, body, (students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12))
 #Update_student_D_times = jit(Update_student_D_times, static_argnums=(4,5,6,7,8,9,10,11))
 
 #delete below function when on cluster
@@ -189,10 +175,11 @@ def Run_simulation(D, n, lr, teacher, students_1, students_2, T, r_1, r_2, r_12,
 
         x_key = create_key(random_seed())
         X_s = sample_observations(T, D, n, x_key)
-        Y_t_s = teacher_decisions(teacher, X_s, T)
+        Y_t_s = teacher_decisions(teacher, X_s)
 
-        students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, X_s, Y_t_s, 
-                                                                                  D, T, lr, r_1, r_2, r_12, tau_1, tau_2)
+        students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12, 
+                                                                                 X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2)
+        
         
     return J_1_s[:save_number, :], J_2_s[:save_number, :], Q_1_s[:save_number, :], Q_2_s[:save_number, :], Q_12_s[:save_number, :]
 
@@ -206,5 +193,6 @@ def Run_simulation(D, n, lr, teacher, students_1, students_2, T, r_1, r_2, r_12,
 """if __name__ == "__main__":
 
     parser = argparse.ArgumentParser()
+    boogit boogity boogity
 """
     
