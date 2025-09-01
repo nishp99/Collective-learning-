@@ -73,10 +73,23 @@ def Heavi12_negheavi12Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
     prob = 1/(2 * jnp.pi) * (-jnp.arccos(Q_12 / jnp.sqrt(Q_1*Q_2)) + jnp.arccos(J_1/jnp.sqrt(Q_1*S)) + jnp.arccos(J_2/jnp.sqrt(Q_2*S)))
     return prob
 
-def SgnXY_modZ(Q_x, Q_y, Q_z, J_xz, J_yz, J_xy):
-    return 2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * (jnp.sqrt(Q_z) * jnp.arcsin(RhoXY_Z(Q_z, Q_y, Q_x, J_xz, J_xy, J_yz)) +
-                        J_xz / jnp.sqrt(Q_x) * jnp.arcsin(RhoXY_Z(Q_z, Q_x, Q_y, J_yz, J_xy, J_xz)) +
-                        J_yz / jnp.sqrt(Q_y) * jnp.arcsin(RhoXY_Z(Q_x, Q_y, Q_z, J_xz, J_yz, J_xy)))
+def Sgn2Nu_mod1(Q_1, Q_2, S, J_1, J_2, Q_12):
+    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
+            (np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+              + Q_12 / np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
+                + J_1 / np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
+
+def Sgn1Nu_mod2(Q_1, Q_2, S, J_1, J_2, Q_12):
+    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
+            (np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
+              + Q_12 / np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+                + J_2 / np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
+
+def Sgn12_modNu(Q_1, Q_2, S, J_1, J_2, Q_12):
+    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
+            (np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))
+              + J_1 / np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+                + J_2 / np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))))
 
 def Compute_expectations(Q_1, Q_2, Q_12, J_1, J_2, S):
     P_1 = HeaviLambdaNu(J_1, Q_1)
@@ -84,9 +97,9 @@ def Compute_expectations(Q_1, Q_2, Q_12, J_1, J_2, S):
     P_12 = Heavi12_heavi12Nu(J_1, J_2, Q_1, Q_2, Q_12, S)
     P_12_collab = Heavi12_negheavi12Nu(J_1, J_2, Q_1, Q_2, Q_12, S)
 
-    sgn12_modNu = SgnXY_modZ(Q_1, Q_2, S, J_1, J_2, Q_12)
-    sgn1Nu_mod2 = SgnXY_modZ(Q_1, S, Q_2, Q_12, J_2, J_1)
-    sgn2Nu_mod1 = SgnXY_modZ(Q_2, S, Q_1, Q_12, J_1, J_2)
+    sgn12_modNu = Sgn12_modNu(Q_1, Q_2, S, J_1, J_2, Q_12)
+    sgn1Nu_mod2 = Sgn1Nu_mod2(Q_1, Q_2, S, J_1, J_2, Q_12)
+    sgn2Nu_mod1 = Sgn2Nu_mod1(Q_1, Q_2, S, J_1, J_2, Q_12)
 
     sgn1_Nu = SgnX_Y(Q_1, J_1)
     sgn2_Nu = SgnX_Y(Q_2, J_2)
