@@ -29,6 +29,7 @@ import jax.numpy as jnp
 from jax import random, jit, lax, vmap
 import jax
 from jax.lib import xla_bridge
+from jax import debug
 
 import itertools
 import pandas as pd
@@ -74,22 +75,22 @@ def Heavi12_negheavi12Nu(J_1, J_2, Q_1, Q_2, Q_12, S):
     return prob
 
 def Sgn2Nu_mod1(Q_1, Q_2, S, J_1, J_2, Q_12):
-    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
-            (np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
-              + Q_12 / np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
-                + J_1 / np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
+    return (2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * 
+            (jnp.sqrt(Q_1) * jnp.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+              + Q_12 / jnp.sqrt(Q_2) * jnp.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
+                + J_1 / jnp.sqrt(S) * jnp.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
 
 def Sgn1Nu_mod2(Q_1, Q_2, S, J_1, J_2, Q_12):
-    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
-            (np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
-              + Q_12 / np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
-                + J_2 / np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
+    return (2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * 
+            (jnp.sqrt(Q_2) * jnp.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))
+              + Q_12 / jnp.sqrt(Q_1) * jnp.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+                + J_2 / jnp.sqrt(S) * jnp.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))))
 
 def Sgn12_modNu(Q_1, Q_2, S, J_1, J_2, Q_12):
-    return (2 * np.sqrt(2) / (np.pi * np.sqrt(np.pi)) * 
-            (np.sqrt(S) * np.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))
-              + J_1 / np.sqrt(Q_1) * np.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
-                + J_2 / np.sqrt(Q_2) * np.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))))
+    return (2 * jnp.sqrt(2) / (jnp.pi * jnp.sqrt(jnp.pi)) * 
+            (jnp.sqrt(S) * jnp.arcsin(RhoXY_Z(Q_1, Q_2, S, J_1, J_2, Q_12))
+              + J_1 / jnp.sqrt(Q_1) * jnp.arcsin(RhoXY_Z(Q_2, S, Q_1, Q_12, J_1, J_2))
+                + J_2 / jnp.sqrt(Q_2) * jnp.arcsin(RhoXY_Z(Q_1, S, Q_2, Q_12, J_2, J_1))))
 
 def Compute_expectations(Q_1, Q_2, Q_12, J_1, J_2, S):
     P_1 = HeaviLambdaNu(J_1, Q_1)
@@ -189,7 +190,7 @@ def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints,
     num_saves = save_epochs.shape[0]
 
     # ---- Initial state ----
-    init_state = (J_1_init, J_2_init, Q_1_init, Q_2_init, Q_12_init)
+    init_state = (jnp.array(J_1_init), jnp.array(J_2_init), jnp.array(Q_1_init), jnp.array(Q_2_init), jnp.array(Q_12_init))
 
     # ---- One scan step = integrate between savepoints ----
     def scan_body(carry, delta):
@@ -206,12 +207,18 @@ def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints,
     # ---- Run scan over deltas ----
     _, trajectory = lax.scan(scan_body, init_state, deltas)
 
+    
     # ---- Split results ----
     J_1_s, J_2_s, Q_1_s, Q_2_s, Q_12_s = trajectory
+    J_1_s = jnp.concatenate((jnp.array([J_1_init]), J_1_s))
+    J_2_s = jnp.concatenate((jnp.array([J_2_init]), J_2_s))
+    Q_1_s = jnp.concatenate((jnp.array([Q_1_init]), Q_1_s))
+    Q_2_s = jnp.concatenate((jnp.array([Q_2_init]), Q_2_s))
+    Q_12_s = jnp.concatenate((jnp.array([Q_12_init]), Q_12_s))
     return J_1_s, J_2_s, Q_1_s, Q_2_s, Q_12_s
 
 # JIT (same as before)
-ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9, 15))
+#ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9, 15))
 vmapped_ODE_solver = jax.vmap(ODE_solver, in_axes=(0, 0, 0, 0, 0, 0, 0, None, None, None))
 
 
