@@ -78,7 +78,7 @@ def Individual_ALL(y_s, y_t):
     return reward
 
 def Collaborative_ALL(y_1, y_2, y_t):
-    reward = (jnp.all(y_1 == y_2, axis=1) * jnp.all(y_1 == y_t, axis=1)).astype(jnp.float32)
+    reward = (jnp.all(y_1 == y_2, axis=1) * jnp.all(y_1 != y_t, axis=1)).astype(jnp.float32)
     return reward
 
 def Reward(r_1, r_2, r_12, tau_1, tau_2, y_1, y_2, y_t):
@@ -160,18 +160,19 @@ def Run_simulation(D, n, lr, teacher, students_1, students_2, T, r_1, r_2, r_12,
 
     for i in range(len(deltas)):
         for _ in range(deltas[i]):
-            x_key = create_key(random_seed())
+            #x_key = create_key(random_seed())
+            x_key = create_key(10)
             X_s = sample_observations(T, D, n, x_key)
             Y_t_s = teacher_decisions(teacher, X_s)
 
             students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12, 
                                                                                      X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2)
             
-            J_1_s = J_1_s.at[i, :].set(J_1)
-            J_2_s = J_2_s.at[i, :].set(J_2)
-            Q_1_s = Q_1_s.at[i, :].set(Q_1)
-            Q_2_s = Q_2_s.at[i, :].set(Q_2)
-            Q_12_s = Q_12_s.at[i, :].set(Q_12)
+            J_1_s = J_1_s.at[i+1, :].set(J_1)
+            J_2_s = J_2_s.at[i+1, :].set(J_2)
+            Q_1_s = Q_1_s.at[i+1, :].set(Q_1)
+            Q_2_s = Q_2_s.at[i+1, :].set(Q_2)
+            Q_12_s = Q_12_s.at[i+1, :].set(Q_12)
 
 
     """for epoch in range(epochs):
