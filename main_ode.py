@@ -153,7 +153,7 @@ def dQ_ij(T, eta, r_1, r_2, r_12, tau_1, tau_2, mod1, mod2, sgn1_2, sgn2_1, sgnN
 update D times for the ODE solver
 """
 def update_D_times(dt, eta, T, r_1, r_2, r_12, tau_1, tau_2, J_1, J_2, Q_1, Q_2, Q_12, S):
-    D = 400
+    D = 3000
     def body(_, state):
         J_1, J_2, Q_1, Q_2, Q_12 = state
 
@@ -171,6 +171,8 @@ def update_D_times(dt, eta, T, r_1, r_2, r_12, tau_1, tau_2, J_1, J_2, Q_1, Q_2,
                       sgnNu2, sgn1Nu_mod2, sgn2Nu_mod1, P_1, P_2, P_12, P_12_collab) * dt
 
         return J_1 + dJ_1, J_2 + dJ_2, Q_1 + dQ_1, Q_2 + dQ_2, Q_12 + dQ_12
+        #return J_1 - dJ_1, J_2 - dJ_2, Q_1 - dQ_1, Q_2 - dQ_2, Q_12 - dQ_12
+    
 
     return lax.fori_loop(0, D, body, (J_1, J_2, Q_1, Q_2, Q_12))
 
@@ -218,7 +220,7 @@ def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints,
     return J_1_s, J_2_s, Q_1_s, Q_2_s, Q_12_s
 
 # JIT (same as before)
-#ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9, 15))
+ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9, 15))
 vmapped_ODE_solver = jax.vmap(ODE_solver, in_axes=(0, 0, 0, 0, 0, 0, 0, None, None, None))
 
 

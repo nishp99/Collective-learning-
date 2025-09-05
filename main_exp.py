@@ -100,6 +100,7 @@ def student_update(y_s, x_s, R, lr, D, T):
 def Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12, 
                            X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2):
 
+    #def body(i, carry):
     def body(i, carry):
         students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = carry
         x_s = X_s[:, :, i, :]
@@ -116,8 +117,9 @@ def Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, 
 
         return students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12
 
+    #return lax.fori_loop(0, D, body, (students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12))
     return lax.fori_loop(0, D, body, (students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12))
-#Update_student_D_times = jit(Update_student_D_times, static_argnums=(4,5,6,7,8,9,10,11))
+Update_student_D_times = jit(Update_student_D_times, static_argnums=(10, 11, 12, 13, 14, 15, 16, 17))
 
 """
 jittable way for finding corresponding index
@@ -160,12 +162,12 @@ def Run_simulation(D, n, lr, teacher, students_1, students_2, T, r_1, r_2, r_12,
 
     for i in range(len(deltas)):
         for _ in range(deltas[i]):
-            #x_key = create_key(random_seed())
-            x_key = create_key(10)
+            x_key = create_key(random_seed())
+            #x_key = create_key(10)
             X_s = sample_observations(T, D, n, x_key)
             Y_t_s = teacher_decisions(teacher, X_s)
 
-            students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12, 
+            students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12 = Update_student_D_times(teacher, students_1, students_2, J_1, J_2, Q_1, Q_2, Q_12,
                                                                                      X_s, Y_t_s, D, T, lr, r_1, r_2, r_12, tau_1, tau_2)
             
             J_1_s = J_1_s.at[i+1, :].set(J_1)
