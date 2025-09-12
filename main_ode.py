@@ -136,7 +136,7 @@ def dQ_i(T, eta, r_i, r_j, r_12, tau_j, modi, sgnNu_i, sgnjNu_modi, sgnj_i,
     dq = (eta * (r_i * P_i**(T - 1) * (modi + sgnNu_i) + tau_j * r_j * P_j**(T - 1) * (modi + sgnjNu_modi) + 
                  r_12 / 2 * P_12_collab**(T - 1) * (modi + sgnj_i - sgnjNu_modi - sgnNu_i)) + 
                  eta**2 / T * (r_i**2 * P_i**T + tau_j * r_j**2 * P_j**T + 
-                               r_12**2 * P_12_collab**T + r_i * r_j * tau_j * P_12**T))
+                               r_12**2 * P_12_collab**T + 2 * r_i * r_j * tau_j * P_12**T))
     return dq
 
 def dQ_ij(T, eta, r_1, r_2, r_12, tau_1, tau_2, mod1, mod2, sgn1_2, sgn2_1, sgnNu_1, 
