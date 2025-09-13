@@ -261,7 +261,7 @@ def main_batched(args):
     end = time.time()
     print("Total time taken:", end - start)
     
-if __name__ == "__main__":
+"""if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="ODE Solver")
     parser.add_argument("--logdir",
@@ -287,4 +287,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main_batched(args)
+    main_batched(args)"""

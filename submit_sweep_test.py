@@ -38,7 +38,7 @@ r_12s=[1.0]
 tau_1s=[0.0]
 tau_2s=[0.0]
 D = 1000
-epochs=1000
+epochs=100
 savepoints=100
 
 """
