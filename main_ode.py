@@ -171,7 +171,6 @@ def update_D_times(dt, eta, T, r_1, r_2, r_12, tau_1, tau_2, J_1, J_2, Q_1, Q_2,
                       sgnNu2, sgn1Nu_mod2, sgn2Nu_mod1, P_1, P_2, P_12, P_12_collab) * dt
 
         return J_1 + dJ_1, J_2 + dJ_2, Q_1 + dQ_1, Q_2 + dQ_2, Q_12 + dQ_12
-        #return J_1 - dJ_1, J_2 - dJ_2, Q_1 - dQ_1, Q_2 - dQ_2, Q_12 - dQ_12
     
 
     return lax.fori_loop(0, D, body, (J_1, J_2, Q_1, Q_2, Q_12))
@@ -220,38 +219,33 @@ def ODE_solver(eta, T, r_1, r_2, r_12, tau_1, tau_2, dt, epochs, savepoints,
     return J_1_s, J_2_s, Q_1_s, Q_2_s, Q_12_s
 
 # JIT (same as before)
-ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9, 15))
-vmapped_ODE_solver = jax.vmap(ODE_solver, in_axes=(0, 0, 0, 0, 0, 0, 0, None, None, None))
+ODE_solver = jit(ODE_solver, static_argnums=(7, 8, 9))
+vmapped_ODE_solver = jax.vmap(ODE_solver, in_axes=(0, 0, 0, 0, 0, 0, 0, None, None, None, 0, 0, 0, 0, 0, 0))
 
 
 
 def main_batched(args):
-    jax.config.update("jax_platform_name", "cpu")
     dt = 1 / args.D
     os.makedirs(args.logdir, exist_ok=True)
 
     #create batch of parameter combinations
-    param_lists = [args.lrs, args.Ts, args.r_1s, args.r_2s, args.r_12s, args.tau_1s, args.tau_2s]
+    param_lists = [args.lrs, args.Ts, args.r_1s, args.r_2s, args.r_12s, args.tau_1s, args.tau_2s,
+                   args.J_1_inits, args.J_2_inits, args.Q_1_inits, args.Q_2_inits, args.Q_12_inits, args.S_s]
     param_combinations = list(itertools.product(*param_lists))
     param_array = jnp.array(param_combinations)
-    lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch = param_array.T
+    lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch, J_1_batch, J_2_batch, Q_1_batch, Q_2_batch, Q_12_batch, S_batch = param_array.T
 
     #run batch of ODEs
     start = time.time()
     results = vmapped_ODE_solver(lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch, dt, args.epochs, args.savepoints,
-                                 args.J_1_init, args.J_2_init, args.Q_1_init, args.Q_2_init, args.Q_12_init, args.S)
-    
+                                 J_1_batch, J_2_batch, Q_1_batch, Q_2_batch, Q_12_batch, S_batch)
+
     #store results in pandas dataframe
     J_1_vals, J_2_vals, Q_1_vals, Q_2_vals, Q_12_vals = jnp.array(results)
     param_combinations_python = [tuple(map(float, combo)) for combo in param_combinations]
-    multi_index = pd.MultiIndex.from_tuples(param_combinations_python, names=['lr', 'T', 'r_1', 'r_2', 'r_12', 'tau_1', 'tau_2'])
-    """df = jl.dump({
-        'J_1': list(J_1_vals),
-        'J_2': list(J_2_vals),
-        'Q_1': list(Q_1_vals),
-        'Q_2': list(Q_2_vals),
-        'Q_12': list(Q_12_vals)
-    }, os.path.join(args.logdir, 'ode.jl'))"""
+    multi_index = pd.MultiIndex.from_tuples(param_combinations_python, names=['lr', 'T', 'r_1', 'r_2', 'r_12', 'tau_1', 'tau_2', 
+                                                                              'J_1_init', 'J_2_init', 'Q_1_init', 'Q_2_init', 'Q_12_init', 'S'])
+
     df = pd.DataFrame({
         'J_1': list(J_1_vals),
         'J_2': list(J_2_vals),
@@ -267,7 +261,7 @@ def main_batched(args):
     end = time.time()
     print("Total time taken:", end - start)
     
-if __name__ == "__main__":
+"""if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(description="ODE Solver")
     parser.add_argument("--logdir",
@@ -293,4 +287,4 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    main_batched(args)
+    main_batched(args)"""
