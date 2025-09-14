@@ -230,7 +230,7 @@ def main_batched(args):
 
     #create batch of parameter combinations
     param_lists = [args.lrs, args.Ts, args.r_1s, args.r_2s, args.r_12s, args.tau_1s, args.tau_2s,
-                   args.J_1_inits, args.J_2_inits, args.Q_1_inits, args.Q_2_inits, args.Q_12_inits, args.S_s]
+                   args.J_1_inits, args.J_2_inits, args.Q_1_inits, args.Q_2_inits, args.Q_12_inits, args.Ss]
     param_combinations = list(itertools.product(*param_lists))
     param_array = jnp.array(param_combinations)
     lr_batch, T_batch, r_1_batch, r_2_batch, r_12_batch, tau_1_batch, tau_2_batch, J_1_batch, J_2_batch, Q_1_batch, Q_2_batch, Q_12_batch, S_batch = param_array.T
@@ -243,7 +243,7 @@ def main_batched(args):
     #store results in pandas dataframe
     J_1_vals, J_2_vals, Q_1_vals, Q_2_vals, Q_12_vals = jnp.array(results)
     param_combinations_python = [tuple(map(float, combo)) for combo in param_combinations]
-    multi_index = pd.MultiIndex.from_tuples(param_combinations_python, names=['lr', 'T', 'r_1', 'r_2', 'r_12', 'tau_1', 'tau_2', 
+    multi_index = pd.MultiIndex.from_tuples(param_combinations_python, names=['lr', 'T', 'r_1', 'r_2', 'r_12', 'tau_1', 'tau_2',
                                                                               'J_1_init', 'J_2_init', 'Q_1_init', 'Q_2_init', 'Q_12_init', 'S'])
 
     df = pd.DataFrame({
