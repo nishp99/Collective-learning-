@@ -143,8 +143,7 @@ def dQ_ij(T, eta, r_1, r_2, r_12, tau_1, tau_2, mod1, mod2, sgn1_2, sgn2_1, sgnN
           sgnNu_2, sgn12, sgnNu1, sgnNu2, sgn1Nu_mod2, sgn2Nu_mod1, P_1, P_2, P_12, P_12_collab):
     dq_ij = (eta / 2 * (r_1 * (sgn1_2 + sgnNu_2 + tau_1 * (sgn2_1 + sgn2Nu_mod1)) * P_1**(T - 1) + r_2 * (sgn2_1 + sgnNu_1 + tau_2 * (sgn1_2 + sgn1Nu_mod2)) * P_2**(T - 1) + 
                     r_12 / 2 * (mod2 + sgn1_2 - sgn1Nu_mod2 - sgnNu_2 + mod1 + sgn2_1 - sgn2Nu_mod1 - sgnNu_1) * P_12_collab**(T - 1)) + 
-                    eta**2 / T * ((1 + tau_1 * tau_2) * r_1 * r_2 / 4 * (1 + sgn12 + sgnNu1 + sgnNu2) * P_12**(T - 1) + 
-                                  r_12**2 / 4 * (1 + sgn12 - sgnNu1 - sgnNu2) * P_12_collab**(T - 1) + 
+                    eta**2 / T * ((1 + tau_1 * tau_2) * r_1 * r_2 * P_12**T + r_12**2 * P_12_collab**T + 
                                   tau_1**2 * r_1**2 / 2 * (sgn12 + sgnNu2) * P_1**(T - 1) + tau_2**2 * r_2**2 / 2 * (sgn12 + sgnNu1) * P_2**(T - 1)))
     return dq_ij
 
